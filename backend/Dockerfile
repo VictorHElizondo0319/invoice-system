@@ -24,6 +24,8 @@ COPY . /var/www
 # Copy existing application directory permissions
 COPY --chown=www-data:www-data . /var/www
 
+RUN if [ ! -f .env ]; then cp .env.example .env; fi
+
 # Install dependencies
 RUN composer install --no-dev --optimize-autoloader --no-interaction
 
