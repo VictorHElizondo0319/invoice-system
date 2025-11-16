@@ -38,7 +38,7 @@ services:
       DB_USERNAME: invoiceuser
       DB_PASSWORD: invoicepass
       APP_ENV: production
-      APP_DEBUG: false
+      APP_DEBUG: "false"
     volumes:
       - ./backend:/var/www
       - backend_storage:/var/www/storage
