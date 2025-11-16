@@ -39,7 +39,6 @@ services:
       DB_PASSWORD: invoicepass
       APP_ENV: production
       APP_DEBUG: false
-      APP_KEY: base64:$(openssl rand -base64 32)
     volumes:
       - ./backend:/var/www
       - backend_storage:/var/www/storage
