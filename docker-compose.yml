@@ -65,6 +65,9 @@ services:
     build:
       context: ./frontend
       dockerfile: Dockerfile
+      args:
+        # Pass VITE_API_URL at build time so Vite embeds it into the static build
+        VITE_API_URL: ${VITE_API_URL:-http://backend:8000/api}
     container_name: invoice_frontend
     restart: unless-stopped
     ports:
@@ -73,8 +76,9 @@ services:
       - backend
     networks:
       - invoice_network
+    # optional runtime env (not used by the static build), kept for clarity
     environment:
-      VITE_API_URL: http://localhost:8000/api
+      VITE_API_URL: http://backend:8000/api
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:80"]
       interval: 30s
