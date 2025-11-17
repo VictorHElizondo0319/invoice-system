@@ -12,7 +12,11 @@ RUN npm ci
 # Copy all files
 COPY . .
 
-# Build the application
+# Accept build-time API URL (Vite reads env vars at build time)
+ARG VITE_API_URL
+ENV VITE_API_URL=${VITE_API_URL}
+
+# Build the application (will embed `import.meta.env.VITE_API_URL` at build time)
 RUN npm run build
 
 # Production stage
