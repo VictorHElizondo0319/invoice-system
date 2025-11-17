@@ -28,7 +28,7 @@ services:
       context: ./backend
       dockerfile: Dockerfile
     container_name: invoice_backend
-    restart: unless-stopped
+    restart: "no"
     working_dir: /var/www
     environment:
       DB_CONNECTION: pgsql
