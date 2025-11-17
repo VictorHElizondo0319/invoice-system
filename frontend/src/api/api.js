@@ -1,8 +1,6 @@
 import axios from 'axios';
 
-const API_BASE_URL = (typeof window !== 'undefined' && window.__env && window.__env.VITE_API_URL)
-  || import.meta.env.VITE_API_URL
-  || 'http://localhost:8000/api';
+const API_BASE_URL = '/api';
 
 const api = axios.create({
   baseURL: API_BASE_URL,
@@ -45,10 +43,8 @@ export const submitInvoice = async (id) => {
 
 // Export invoice as PDF (returns blob)
 export const exportInvoice = async (id) => {
-  const response = await api.post(`/invoice/${id}/export`, null, {
-    responseType: 'blob',
-  });
-  return response;
+  const { data } = await api.post(`/invoice/${id}/export`);
+  return data;
 };
 
 // Payments

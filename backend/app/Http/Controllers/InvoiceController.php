@@ -8,6 +8,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
 use Barryvdh\DomPDF\Facade\Pdf as PDF;
+use Illuminate\Support\Facades\Storage;
 
 class InvoiceController extends Controller
 {
@@ -30,6 +31,25 @@ class InvoiceController extends Controller
 
         $invoices = $query->latest()->get();
 
+        // Attach a public PDF URL for any invoice that has an S3 key/url saved.
+        foreach ($invoices as $inv) {
+            if ($inv->invoice_pdf_url) {
+                $stored = $inv->invoice_pdf_url;
+                if (filter_var($stored, FILTER_VALIDATE_URL)) {
+                    $inv->pdf_url = $stored;
+                } else {
+                    $bucketUrl = config('filesystems.disks.s3.url');
+                    if ($bucketUrl) {
+                        $inv->pdf_url = rtrim($bucketUrl, '/') . '/' . $stored;
+                    } else {
+                        $region = config('filesystems.disks.s3.region');
+                        $bucket = config('filesystems.disks.s3.bucket');
+                        $inv->pdf_url = "https://{$bucket}.s3.{$region}.amazonaws.com/{$stored}";
+                    }
+                }
+            }
+        }
+
         return response()->json($invoices);
     }
 
@@ -50,12 +70,38 @@ class InvoiceController extends Controller
             $pdf = PDF::loadView('invoices.pdf', ['invoice' => $invoice])
                 ->setPaper('a4', 'portrait');
 
-            $filename = 'invoice_' . $invoice->id . '.pdf';
+            $content = $pdf->output();
+            $filename = 'invoice_' . $invoice->id . '_' . time() . '.pdf';
+            $path = 'invoices/' . $filename;
 
-            return $pdf->download($filename);
+            Storage::disk('s3')->put($path, $content);
+            // Build the public URL (using AWS_URL from config if set, else default S3 URL)
+            $bucketUrl = config('filesystems.disks.s3.url');
+            if ($bucketUrl) {
+                $publicUrl = rtrim($bucketUrl, '/') . '/' . $path;
+            } else {
+                $region = config('filesystems.disks.s3.region');
+                $bucket = config('filesystems.disks.s3.bucket');
+                $publicUrl = "https://{$bucket}.s3.{$region}.amazonaws.com/{$path}";
+            }
+
+            // Save the S3 key/path (not the full URL) and timestamp on invoice record
+            $invoice->update([
+                'invoice_pdf_url' => $path,
+                'pdf_uploaded_at' => now(),
+            ]);
+
+            // Attach public URL to invoice model for response
+            $invoice->pdf_url = $publicUrl;
+
+            return response()->json([
+                'message' => 'PDF generated and uploaded',
+                'url' => $publicUrl,
+                'invoice' => $invoice
+            ]);
         } catch (\Exception $e) {
             return response()->json([
-                'message' => 'Failed to generate PDF',
+                'message' => 'Failed to generate or upload PDF',
                 'error' => $e->getMessage()
             ], 500);
         }
@@ -131,6 +177,24 @@ class InvoiceController extends Controller
             return response()->json([
                 'message' => 'Invoice not found'
             ], 404);
+        }
+
+        // If an S3 key/path is stored in invoice_pdf_url, compute the public URL for clients
+        if ($invoice->invoice_pdf_url) {
+            $stored = $invoice->invoice_pdf_url;
+            // If the stored value already looks like a full URL, use it directly
+            if (filter_var($stored, FILTER_VALIDATE_URL)) {
+                $invoice->pdf_url = $stored;
+            } else {
+                $bucketUrl = config('filesystems.disks.s3.url');
+                if ($bucketUrl) {
+                    $invoice->pdf_url = rtrim($bucketUrl, '/') . '/' . $stored;
+                } else {
+                    $region = config('filesystems.disks.s3.region');
+                    $bucket = config('filesystems.disks.s3.bucket');
+                    $invoice->pdf_url = "https://{$bucket}.s3.{$region}.amazonaws.com/{$stored}";
+                }
+            }
         }
 
         return response()->json($invoice);

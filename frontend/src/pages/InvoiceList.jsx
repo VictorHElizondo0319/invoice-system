@@ -10,7 +10,7 @@ export default function InvoiceList() {
 
   const { data: invoices, isLoading, error, refetch } = useQuery({
     queryKey: ['invoices', statusFilter, nameFilter],
-    queryFn: () => getInvoices({ 
+    queryFn: () => getInvoices({
       ...(statusFilter && { status: statusFilter }),
       ...(nameFilter && { customer_name: nameFilter })
     }),
@@ -153,40 +153,52 @@ export default function InvoiceList() {
                     </span>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                      <div className="flex items-center gap-4">
-                        <Link
-                          to={`/invoices/${invoice.id}`}
-                          className="text-indigo-600 hover:text-indigo-900"
-                        >
-                          View Details
-                        </Link>
+                    <div className="flex items-center gap-4">
+                      <Link
+                        to={`/invoices/${invoice.id}`}
+                        className="text-indigo-600 hover:text-indigo-900"
+                      >
+                        View Details
+                      </Link>
+                      {invoice.pdf_url && (
                         <button
-                          onClick={async () => {
-                            if (exportingId) return
-                            try {
-                              setExportingId(invoice.id)
-                              const res = await exportInvoice(invoice.id)
-                              const blob = new Blob([res.data], { type: 'application/pdf' })
-                              const url = window.URL.createObjectURL(blob)
-                              const a = document.createElement('a')
-                              a.href = url
-                              a.download = `invoice_${invoice.id}.pdf`
-                              document.body.appendChild(a)
-                              a.click()
-                              a.remove()
-                              window.URL.revokeObjectURL(url)
-                            } catch (err) {
-                              console.error('Export failed', err)
-                              alert('Failed to export invoice PDF.')
-                            } finally {
-                              setExportingId(null)
-                            }
-                          }}
-                          className="inline-flex items-center px-2 py-1 border border-transparent rounded-md text-sm font-medium text-white bg-green-600 hover:bg-green-700"
+                          onClick={() => window.open(invoice.pdf_url, '_blank')}
+                          title="View PDF"
+                          className="inline-flex items-center px-2 py-1 border rounded-md text-sm font-medium text-white bg-gray-700 hover:bg-gray-800"
                         >
-                          {exportingId === invoice.id ? 'Exporting...' : 'Export PDF'}
+                          View
                         </button>
-                      </div>
+                      )}
+                      { 
+                        !invoice.pdf_url && (
+                          <button
+                            onClick={async () => {
+                              if (exportingId) return
+                              try {
+                                setExportingId(invoice.id)
+                                const res = await exportInvoice(invoice.id)
+                                if (res && res.url) {
+                                  // open the S3 URL in new tab
+                                  window.open(res.url, '_blank')
+                                  // refresh invoice list so pdf_url is shown
+                                  try { await refetch() } catch (e) { console.warn('Refetch failed', e) }
+                                } else {
+                                  alert('PDF exported but no URL was returned.')
+                                }
+                              } catch (err) {
+                                console.error('Export failed', err)
+                                alert('Failed to export invoice PDF.')
+                              } finally {
+                                setExportingId(null)
+                              }
+                            }}
+                            className="inline-flex items-center px-2 py-1 border border-transparent rounded-md text-sm font-medium text-white bg-green-600 hover:bg-green-700"
+                          >
+                            {exportingId === invoice.id ? 'Exporting...' : 'Export & Upload'}
+                          </button>
+                        )
+                      }
+                    </div>
                   </td>
                 </tr>
               ))

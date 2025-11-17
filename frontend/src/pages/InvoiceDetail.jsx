@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useParams, useNavigate, Link } from 'react-router-dom'
 import { getInvoice, submitInvoice, createPayment, deleteInvoice } from '../api/api'
+import { exportInvoice } from '../api/api'
 
 export default function InvoiceDetail() {
   const { id } = useParams()
@@ -53,6 +54,21 @@ export default function InvoiceDetail() {
     onError: (error) => {
       alert(`Failed to delete invoice: ${error.response?.data?.message || error.message}`)
     },
+  })
+
+  const exportMutation = useMutation({
+    mutationFn: exportInvoice,
+    onSuccess: (data) => {
+      queryClient.invalidateQueries(['invoice', id])
+      queryClient.invalidateQueries(['invoices'])
+      if (data && data.url) {
+        window.open(data.url, '_blank')
+        alert('PDF uploaded to S3')
+      }
+    },
+    onError: (error) => {
+      alert(`Failed to export PDF: ${error.response?.data?.message || error.message}`)
+    }
   })
 
   const handleSubmit = () => {
@@ -249,6 +265,21 @@ export default function InvoiceDetail() {
                 {showPaymentForm ? 'Cancel Payment' : 'Make Payment'}
               </button>
             )}
+            <div className="ml-auto">
+              {invoice.pdf_temp_url ? (
+                <a href={invoice.pdf_temp_url} target="_blank" rel="noreferrer" className="px-4 py-2 bg-gray-700 text-white rounded-md hover:bg-gray-800">
+                  View PDF
+                </a>
+              ) : (
+                <button
+                  onClick={() => exportMutation.mutate(id)}
+                  disabled={exportMutation.isLoading}
+                  className="px-4 py-2 bg-emerald-600 text-white rounded-md hover:bg-emerald-700"
+                >
+                  {exportMutation.isLoading ? 'Exporting...' : 'Export & Upload PDF'}
+                </button>
+              )}
+            </div>
           </div>
 
           {showPaymentForm && (

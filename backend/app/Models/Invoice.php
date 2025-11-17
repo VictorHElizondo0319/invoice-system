@@ -14,7 +14,9 @@ class Invoice extends Model
         'due_date',
         'status',
         'total_amount',
-        'paid_amount'
+        'paid_amount',
+        'invoice_pdf_url',
+        'pdf_uploaded_at'
     ];
 
     protected $casts = [

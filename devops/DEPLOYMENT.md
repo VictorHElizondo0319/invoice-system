@@ -474,6 +474,27 @@ ls -la /var/www/html/invoice-system/
 
 ## Security Checklist
 
+## S3 / Exported PDFs
+
+If your application will store exported PDFs in AWS S3, configure the following in your backend environment (backend/.env) and as secrets in CI if needed:
+
+- `AWS_ACCESS_KEY_ID`
+- `AWS_SECRET_ACCESS_KEY`
+- `AWS_DEFAULT_REGION`
+- `AWS_BUCKET` (bucket name)
+
+Laravel uses the `s3` disk configured in `config/filesystems.php`. Ensure your `.env` contains the AWS variables and that the bucket has appropriate permissions (or the uploaded objects are made public if you want public URLs).
+
+Don't forget to run the migration that adds the `invoice_pdf_url` column before trying to export PDFs:
+
+```bash
+cd backend
+php artisan migrate
+```
+
+When exporting, the backend will upload the generated PDF to S3 and save the URL on the invoice record. The frontend will show a link to the uploaded PDF once present.
+
+
 - [ ] Changed default database password
 - [ ] Set APP_DEBUG=false in production
 - [ ] Generated unique APP_KEY
