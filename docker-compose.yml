@@ -43,7 +43,7 @@ services:
       - ./backend:/var/www
       - backend_storage:/var/www/storage
     ports:
-      - "8000:8000"
+      - "8000:9000"
     depends_on:
       db:
         condition: service_healthy
