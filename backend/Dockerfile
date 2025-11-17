@@ -31,5 +31,5 @@ RUN if [ ! -f .env ]; then cp .env.example .env; fi \
 # permissions (optional but helpful)
 RUN chown -R www-data:www-data /var/www
 
-EXPOSE 9000
+EXPOSE 8000
 CMD ["php-fpm"]
