@@ -283,8 +283,8 @@ export default function InvoiceDetail() {
                   View PDF
                 </a>
               ) : (
-                // Only allow export for admins or the invoice owner
-                (isAdmin || isOwner) ? (
+                // Only allow export for admins or the invoice owner, and only if invoice is PAID
+                (invoice.status === 'PAID' && (isAdmin || isOwner)) ? (
                   <button
                     onClick={() => exportMutation.mutate(id)}
                     disabled={exportMutation.isLoading}

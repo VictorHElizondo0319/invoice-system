@@ -201,8 +201,8 @@ export default function InvoiceList() {
                           View
                         </button>
                         ) : (
-                        // allow export for admins, invoice creator, or the customer
-                        (currentUser && (currentUser.role === 'admin' || invoice.user_id === currentUser.id || invoice.customer_id === currentUser.id)) ? (
+                        // allow export for admins, invoice creator, or the customer — but only if invoice is PAID
+                        (currentUser && invoice.status === 'PAID' && (currentUser.role === 'admin' || invoice.user_id === currentUser.id || invoice.customer_id === currentUser.id)) ? (
                           <button
                             onClick={async () => {
                               if (exportingId) return
