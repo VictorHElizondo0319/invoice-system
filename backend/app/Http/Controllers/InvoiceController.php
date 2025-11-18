@@ -83,6 +83,11 @@ class InvoiceController extends Controller
             return response()->json(['message' => 'Forbidden'], 403);
         }
 
+        // Only paid invoices can be exported/uploaded
+        if ($invoice->status !== 'PAID') {
+            return response()->json(['message' => 'Only paid invoices can be exported'], 400);
+        }
+
         try {
             $pdf = PDF::loadView('invoices.pdf', ['invoice' => $invoice])
                 ->setPaper('a4', 'portrait');
