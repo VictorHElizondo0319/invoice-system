@@ -1,12 +1,16 @@
 import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { getInvoices, exportInvoice } from '../api/api'
+import { getInvoices, exportInvoice, deleteInvoice, getCurrentUser } from '../api/api'
 import { Link } from 'react-router-dom'
+import { useAuth } from '../context/AuthContext'
 
 export default function InvoiceList() {
   const [statusFilter, setStatusFilter] = useState('')
   const [nameFilter, setNameFilter] = useState('')
   const [exportingId, setExportingId] = useState(null)
+
+  const { user } = useAuth()
+  const isAdmin = user?.role === 'admin'
 
   const { data: invoices, isLoading, error, refetch } = useQuery({
     queryKey: ['invoices', statusFilter, nameFilter],
@@ -15,6 +19,8 @@ export default function InvoiceList() {
       ...(nameFilter && { customer_name: nameFilter })
     }),
   })
+
+  const currentUser = getCurrentUser()
 
   const getStatusColor = (status) => {
     const colors = {
@@ -54,6 +60,12 @@ export default function InvoiceList() {
     )
   }
 
+  // Filter invoices for user role
+  let filteredInvoices = invoices || [];
+  if (currentUser && currentUser.role !== 'admin') {
+    filteredInvoices = filteredInvoices.filter(inv => inv.customer_id === currentUser.id);
+  }
+
   return (
     <div className="px-4 sm:px-0">
       <div className="sm:flex sm:items-center sm:justify-between mb-8">
@@ -62,13 +74,15 @@ export default function InvoiceList() {
           <p className="mt-2 text-gray-600">Manage all your invoices</p>
         </div>
         <div className="mt-4 sm:mt-0">
-          <Link
-            to="/invoices/create"
-            className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700"
-          >
-            <span className="mr-2">➕</span>
-            Create Invoice
-          </Link>
+          {currentUser && currentUser.role === 'admin' && (
+            <Link
+              to="/invoices/create"
+              className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700"
+            >
+              <span className="mr-2">➕</span>
+              Create Invoice
+            </Link>
+          )}
         </div>
       </div>
 
@@ -132,8 +146,8 @@ export default function InvoiceList() {
             </tr>
           </thead>
           <tbody className="bg-white divide-y divide-gray-200">
-            {invoices && invoices.length > 0 ? (
-              invoices.map((invoice) => (
+            {filteredInvoices && filteredInvoices.length > 0 ? (
+              filteredInvoices.map((invoice) => (
                 <tr key={invoice.id} className="hover:bg-gray-50">
                   <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
                     #{invoice.id}
@@ -160,7 +174,25 @@ export default function InvoiceList() {
                       >
                         View Details
                       </Link>
-                      {invoice.pdf_url && (
+                      {currentUser && currentUser.role === 'admin' && (
+                        <button
+                          onClick={async () => {
+                            if (!confirm('Delete this invoice?')) return
+                            try {
+                              await deleteInvoice(invoice.id)
+                              await refetch()
+                            } catch (err) {
+                              console.error('Delete failed', err)
+                              alert('Failed to delete invoice')
+                            }
+                          }}
+                          title="Delete"
+                          className="inline-flex items-center px-2 py-1 border rounded-md text-sm font-medium text-white bg-red-600 hover:bg-red-700"
+                        >
+                          Delete
+                        </button>
+                      )}
+                      {invoice.pdf_url ? (
                         <button
                           onClick={() => window.open(invoice.pdf_url, '_blank')}
                           title="View PDF"
@@ -168,9 +200,9 @@ export default function InvoiceList() {
                         >
                           View
                         </button>
-                      )}
-                      { 
-                        !invoice.pdf_url && (
+                        ) : (
+                        // allow export for admins, invoice creator, or the customer
+                        (currentUser && (currentUser.role === 'admin' || invoice.user_id === currentUser.id || invoice.customer_id === currentUser.id)) ? (
                           <button
                             onClick={async () => {
                               if (exportingId) return
@@ -196,8 +228,17 @@ export default function InvoiceList() {
                           >
                             {exportingId === invoice.id ? 'Exporting...' : 'Export & Upload'}
                           </button>
-                        )
-                      }
+                        ) : null
+                      )}
+                      {/* Payment actions (available to admins and the invoice's customer/creator) */}
+                      {!isAdmin && currentUser && (invoice.customer_id === currentUser.id || invoice.user_id === currentUser.id) && (
+                        <Link
+                          to={`/invoices/${invoice.id}`}
+                          className="inline-flex items-center px-2 py-1 border rounded-md text-sm font-medium text-white bg-blue-600 hover:bg-blue-700"
+                        >
+                          Make Payment
+                        </Link>
+                      )}
                     </div>
                   </td>
                 </tr>

@@ -1,13 +1,23 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { useNavigate, Link } from 'react-router-dom'
 import { createInvoice } from '../api/api'
+import { useAuth } from '../context/AuthContext'
+import CustomerSelect from '../components/CustomerSelect'
 
 export default function CreateInvoice() {
   const navigate = useNavigate()
   const queryClient = useQueryClient()
+  const { user } = useAuth()
+  useEffect(() => {
+    if (!user) return
+    if (user.role !== 'admin') {
+      alert('You are not authorized to access this page.')
+      navigate('/invoices')
+    }
+  }, [user, navigate])
 
-  const [customerName, setCustomerName] = useState('')
+  const [selectedCustomer, setSelectedCustomer] = useState(null)
   const [dueDate, setDueDate] = useState('')
   const [items, setItems] = useState([
     { description: '', qty: 1, price: '' }
@@ -53,8 +63,8 @@ export default function CreateInvoice() {
     e.preventDefault()
 
     // Validation
-    if (!customerName.trim()) {
-      alert('Please enter customer name')
+    if (!selectedCustomer || !selectedCustomer.name) {
+      alert('Please select or create a customer')
       return
     }
 
@@ -73,7 +83,7 @@ export default function CreateInvoice() {
     }
 
     const invoiceData = {
-      customer_name: customerName,
+      customer_id: selectedCustomer.id,
       due_date: dueDate,
       items: validItems.map(item => ({
         description: item.description,
@@ -107,16 +117,12 @@ export default function CreateInvoice() {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div>
               <label htmlFor="customerName" className="block text-sm font-medium text-gray-700 mb-1">
-                Customer Name *
+                Customer *
               </label>
-              <input
-                type="text"
-                id="customerName"
-                value={customerName}
-                onChange={(e) => setCustomerName(e.target.value)}
-                className="block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm px-3 py-2 border"
-                placeholder="John Doe"
-                required
+              <CustomerSelect
+                value={selectedCustomer}
+                onChange={(cust) => setSelectedCustomer(cust)}
+                placeholder="Search or create customer"
               />
             </div>
 

@@ -1,4 +1,5 @@
 import { Link, Outlet, useLocation } from 'react-router-dom'
+import { useAuth } from '../context/AuthContext'
 
 export default function Layout() {
   const location = useLocation()
@@ -39,13 +40,45 @@ export default function Layout() {
                 </Link>
               </div>
             </div>
+            <div className="flex items-center space-x-4">
+              {/* Signed-in user info + logout/login links */}
+              <AuthInfo />
+            </div>
           </div>
-        </div>
+          </div>
       </nav>
 
       <main className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
         <Outlet />
       </main>
+    </div>
+  )
+}
+
+function AuthInfo() {
+  const { user, signOut } = useAuth()
+
+  if (!user) {
+    return (
+      <div className="hidden sm:flex sm:items-center sm:space-x-4">
+        <Link to="/login" className="text-sm text-gray-700 hover:text-gray-900">Sign in</Link>
+        <Link to="/register" className="text-sm text-indigo-600 hover:text-indigo-800">Register</Link>
+      </div>
+    )
+  }
+
+  return (
+    <div className="hidden sm:flex sm:items-center sm:space-x-4">
+      <div className="text-sm text-gray-700">
+        <div className="font-medium">{user.name}</div>
+        <div className="text-xs text-gray-500">{user.email} {user.role ? `• ${user.role}` : ''}</div>
+      </div>
+      <button
+        onClick={() => signOut()}
+        className="px-3 py-1 bg-gray-100 text-sm rounded-md hover:bg-gray-200"
+      >
+        Logout
+      </button>
     </div>
   )
 }

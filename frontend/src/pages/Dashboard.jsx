@@ -1,12 +1,16 @@
 import { useQuery } from '@tanstack/react-query'
 import { getSummary } from '../api/api'
 import { Link } from 'react-router-dom'
+import { useAuth } from '../context/AuthContext'
 
 export default function Dashboard() {
   const { data: summary, isLoading, error } = useQuery({
     queryKey: ['summary'],
     queryFn: getSummary,
   })
+
+  const { user } = useAuth()
+  const isAdmin = user?.role === 'admin'
 
   if (isLoading) {
     return (
@@ -57,6 +61,9 @@ export default function Dashboard() {
     },
   ]
 
+  // If not admin, hide admin-only stats for the dashboard UI
+  const visibleStats = isAdmin ? stats : stats.filter(s => ['Paid Invoices', 'Unpaid Invoices'].includes(s.name))
+
   return (
     <div className="px-4 sm:px-0">
       <div className="mb-8">
@@ -65,7 +72,7 @@ export default function Dashboard() {
       </div>
 
       <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
-        {stats.map((stat) => (
+        {visibleStats.map((stat) => (
           <div
             key={stat.name}
             className="bg-white overflow-hidden shadow rounded-lg hover:shadow-md transition-shadow"
@@ -94,13 +101,15 @@ export default function Dashboard() {
       <div className="mt-8 bg-white shadow rounded-lg p-6">
         <h2 className="text-xl font-semibold text-gray-900 mb-4">Quick Actions</h2>
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-          <Link
-            to="/invoices/create"
-            className="inline-flex items-center justify-center px-4 py-3 border border-transparent text-base font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 transition-colors"
-          >
-            <span className="mr-2">➕</span>
-            Create New Invoice
-          </Link>
+          {isAdmin && (
+            <Link
+              to="/invoices/create"
+              className="inline-flex items-center justify-center px-4 py-3 border border-transparent text-base font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 transition-colors"
+            >
+              <span className="mr-2">➕</span>
+              Create New Invoice
+            </Link>
+          )}
           <Link
             to="/invoices"
             className="inline-flex items-center justify-center px-4 py-3 border border-gray-300 text-base font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 transition-colors"
@@ -110,8 +119,8 @@ export default function Dashboard() {
           </Link>
         </div>
       </div>
-
-      {summary?.revenue_by_status && (
+      {/* Only show detailed revenue breakdown to admins */}
+      {isAdmin && summary?.revenue_by_status && (
         <div className="mt-8 bg-white shadow rounded-lg p-6">
           <h2 className="text-xl font-semibold text-gray-900 mb-4">Revenue by Status</h2>
           <div className="space-y-3">
@@ -124,6 +133,12 @@ export default function Dashboard() {
               </div>
             ))}
           </div>
+        </div>
+      )}
+
+      {!isAdmin && (
+        <div className="mt-6 text-sm text-gray-600">
+          Some dashboard metrics are only visible to administrators.
         </div>
       )}
     </div>

@@ -9,6 +9,15 @@ const api = axios.create({
   },
 });
 
+// Attach JWT token if available
+api.interceptors.request.use((config) => {
+  const token = localStorage.getItem('authToken');
+  if (token) {
+    config.headers.Authorization = `Bearer ${token}`;
+  }
+  return config;
+});
+
 // Invoices
 export const getInvoices = async (filters = {}) => {
   const params = new URLSearchParams(filters).toString();
@@ -45,6 +54,52 @@ export const submitInvoice = async (id) => {
 export const exportInvoice = async (id) => {
   const { data } = await api.post(`/invoice/${id}/export`);
   return data;
+};
+
+// Customers
+export const getUsers = async (q) => {
+
+  const { data } = await api.get(`/users`);
+  return data;
+};
+
+export const createUser = async (payload) => {
+  const { data } = await api.post('/users', payload);
+  return data;
+};
+
+// Auth
+export const login = async (email, password) => {
+  const { data } = await api.post('/auth/login', { email, password });
+  if (data && data.token) {
+    localStorage.setItem('authToken', data.token);
+    localStorage.setItem('authUser', JSON.stringify(data.user));
+  }
+  return data;
+};
+
+export const register = async (payload) => {
+  const { data } = await api.post('/auth/register', payload);
+  if (data && data.token) {
+    localStorage.setItem('authToken', data.token);
+    localStorage.setItem('authUser', JSON.stringify(data.user));
+  }
+  return data;
+};
+
+export const logout = async () => {
+  try {
+    await api.post('/auth/logout');
+  } catch (e) {
+    // ignore
+  }
+  localStorage.removeItem('authToken');
+  localStorage.removeItem('authUser');
+};
+
+export const getCurrentUser = () => {
+  const raw = localStorage.getItem('authUser');
+  return raw ? JSON.parse(raw) : null;
 };
 
 // Payments

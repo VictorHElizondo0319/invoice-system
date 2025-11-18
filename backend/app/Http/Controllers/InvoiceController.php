@@ -17,16 +17,27 @@ class InvoiceController extends Controller
      */
     public function index(Request $request)
     {
-        $query = Invoice::with('items');
+        $user = auth()->user();
+        $query = Invoice::with('items', 'customer');
+
+        // Only admins see all invoices; regular users see invoices where they are the customer
+        if ($user && $user->role !== 'admin') {
+            $query->where('customer_id', $user->id);
+        }
 
         // Filter by status
         if ($request->has('status')) {
             $query->where('status', $request->status);
         }
 
-        // Filter by customer name
-        if ($request->has('customer_name')) {
-            $query->where('customer_name', 'LIKE', '%' . $request->customer_name . '%');
+        // Filter by customer id or name (admin use)
+        if ($request->has('customer_id')) {
+            $query->where('customer_id', $request->customer_id);
+        } elseif ($request->has('customer_name')) {
+            $name = $request->customer_name;
+            $query->whereHas('customer', function($q) use ($name) {
+                $q->where('name', 'LIKE', '%' . $name . '%');
+            });
         }
 
         $invoices = $query->latest()->get();
@@ -58,12 +69,18 @@ class InvoiceController extends Controller
      */
     public function export($id)
     {
-        $invoice = Invoice::with('items', 'payments')->find($id);
+        $invoice = Invoice::with('items', 'payments', 'customer')->find($id);
 
         if (!$invoice) {
             return response()->json([
                 'message' => 'Invoice not found'
             ], 404);
+        }
+
+        // Only allow export if requester is admin or owner (creator) or the customer
+        $user = auth()->user();
+        if ($user && $user->role !== 'admin' && $invoice->user_id !== $user->id && $invoice->customer_id !== $user->id) {
+            return response()->json(['message' => 'Forbidden'], 403);
         }
 
         try {
@@ -113,7 +130,7 @@ class InvoiceController extends Controller
     public function store(Request $request)
     {
         $validator = Validator::make($request->all(), [
-            'customer_name' => 'required|string|max:255',
+            'customer_id' => 'required|exists:users,id',
             'due_date' => 'required|date|after_or_equal:today',
             'items' => 'required|array|min:1',
             'items.*.description' => 'required|string',
@@ -131,10 +148,18 @@ class InvoiceController extends Controller
         try {
             DB::beginTransaction();
 
+            $user = auth()->user();
+            // Only admins can create invoices (route also protected)
+            if ($user && $user->role !== 'admin') {
+                return response()->json(['message' => 'Forbidden'], 403);
+            }
+
             $invoice = Invoice::create([
-                'customer_name' => $request->customer_name,
+                'customer_id' => $request->customer_id,
+                'customer_name' => optional(\App\Models\User::find($request->customer_id))->name,
                 'due_date' => $request->due_date,
-                'status' => 'DRAFT'
+                'status' => 'DRAFT',
+                'user_id' => $user ? $user->id : null,
             ]);
 
             $totalAmount = 0;
@@ -213,6 +238,12 @@ class InvoiceController extends Controller
             ], 404);
         }
 
+        // Only admins can submit invoices
+        $user = auth()->user();
+        if ($user && $user->role !== 'admin') {
+            return response()->json(['message' => 'Forbidden'], 403);
+        }
+
         if ($invoice->status !== 'DRAFT') {
             return response()->json([
                 'message' => 'Only draft invoices can be submitted'
@@ -240,6 +271,12 @@ class InvoiceController extends Controller
             ], 404);
         }
 
+        // Only admins can update invoices
+        $user = auth()->user();
+        if ($user && $user->role !== 'admin') {
+            return response()->json(['message' => 'Forbidden'], 403);
+        }
+
         if ($invoice->status !== 'DRAFT') {
             return response()->json([
                 'message' => 'Only draft invoices can be updated'
@@ -247,7 +284,7 @@ class InvoiceController extends Controller
         }
 
         $validator = Validator::make($request->all(), [
-            'customer_name' => 'sometimes|string|max:255',
+            'customer_id' => 'sometimes|exists:users,id',
             'due_date' => 'sometimes|date|after_or_equal:today',
             'items' => 'sometimes|array|min:1',
             'items.*.description' => 'required_with:items|string',
@@ -265,7 +302,11 @@ class InvoiceController extends Controller
         try {
             DB::beginTransaction();
 
-            $invoice->update($request->only(['customer_name', 'due_date']));
+            $updateData = $request->only(['customer_id', 'due_date']);
+            if (isset($updateData['customer_id'])) {
+                $updateData['customer_name'] = optional(\App\Models\User::find($updateData['customer_id']))->name;
+            }
+            $invoice->update($updateData);
 
             if ($request->has('items')) {
                 // Delete old items
@@ -313,6 +354,12 @@ class InvoiceController extends Controller
             return response()->json([
                 'message' => 'Invoice not found'
             ], 404);
+        }
+
+        // Only admins can delete invoices (also enforced by middleware)
+        $user = auth()->user();
+        if ($user && $user->role !== 'admin') {
+            return response()->json(['message' => 'Forbidden'], 403);
         }
 
         if ($invoice->status === 'PAID') {
