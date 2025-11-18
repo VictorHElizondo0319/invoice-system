@@ -11,13 +11,24 @@ class Invoice extends Model
 
     protected $fillable = [
         'customer_name',
+        'customer_id',
         'due_date',
         'status',
         'total_amount',
         'paid_amount',
         'invoice_pdf_url',
-        'pdf_uploaded_at'
+        'pdf_uploaded_at',
+        'user_id'
     ];
+    public function user()
+    {
+        return $this->belongsTo(User::class);
+    }
+
+    public function customer()
+    {
+        return $this->belongsTo(User::class, 'customer_id');
+    }
 
     protected $casts = [
         'due_date' => 'date',

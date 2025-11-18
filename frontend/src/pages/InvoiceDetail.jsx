@@ -1,8 +1,9 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useParams, useNavigate, Link } from 'react-router-dom'
 import { getInvoice, submitInvoice, createPayment, deleteInvoice } from '../api/api'
 import { exportInvoice } from '../api/api'
+import { useAuth } from '../context/AuthContext'
 
 export default function InvoiceDetail() {
   const { id } = useParams()
@@ -16,6 +17,17 @@ export default function InvoiceDetail() {
     queryFn: () => getInvoice(id),
   })
 
+  const { user } = useAuth()
+  const isAdmin = user?.role === 'admin'
+  const isOwner = user && invoice && (invoice.customer_id === user.id)
+
+  useEffect(() => {
+    if (!isAdmin && !isOwner) {
+      navigate('/invoices')
+    }
+  }, [isAdmin, isOwner, navigate])
+
+  console.log(!isAdmin || !isOwner)
   const submitMutation = useMutation({
     mutationFn: submitInvoice,
     onSuccess: () => {
@@ -239,7 +251,7 @@ export default function InvoiceDetail() {
           )}
 
           <div className="flex flex-wrap gap-3 pt-4 border-t">
-            {invoice.status === 'DRAFT' && (
+            {invoice.status === 'DRAFT' && isAdmin && (
               <>
                 <button
                   onClick={handleSubmit}
@@ -257,7 +269,7 @@ export default function InvoiceDetail() {
                 </button>
               </>
             )}
-            {(invoice.status === 'SUBMITTED' || (invoice.status === 'PAID' && outstandingAmount > 0)) && (
+            {!isAdmin && (invoice.status === 'SUBMITTED' || (invoice.status === 'PAID' && outstandingAmount > 0)) && (
               <button
                 onClick={() => setShowPaymentForm(!showPaymentForm)}
                 className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700"
@@ -266,18 +278,23 @@ export default function InvoiceDetail() {
               </button>
             )}
             <div className="ml-auto">
-              {invoice.pdf_temp_url ? (
-                <a href={invoice.pdf_temp_url} target="_blank" rel="noreferrer" className="px-4 py-2 bg-gray-700 text-white rounded-md hover:bg-gray-800">
+              {(invoice.pdf_url || invoice.pdf_temp_url) ? (
+                <a href={invoice.pdf_url || invoice.pdf_temp_url} target="_blank" rel="noreferrer" className="px-4 py-2 bg-gray-700 text-white rounded-md hover:bg-gray-800">
                   View PDF
                 </a>
               ) : (
-                <button
-                  onClick={() => exportMutation.mutate(id)}
-                  disabled={exportMutation.isLoading}
-                  className="px-4 py-2 bg-emerald-600 text-white rounded-md hover:bg-emerald-700"
-                >
-                  {exportMutation.isLoading ? 'Exporting...' : 'Export & Upload PDF'}
-                </button>
+                // Only allow export for admins or the invoice owner
+                (isAdmin || isOwner) ? (
+                  <button
+                    onClick={() => exportMutation.mutate(id)}
+                    disabled={exportMutation.isLoading}
+                    className="px-4 py-2 bg-emerald-600 text-white rounded-md hover:bg-emerald-700"
+                  >
+                    {exportMutation.isLoading ? 'Exporting...' : 'Export & Upload PDF'}
+                  </button>
+                ) : (
+                  <span className="text-sm text-gray-500">PDF not available</span>
+                )
               )}
             </div>
           </div>
